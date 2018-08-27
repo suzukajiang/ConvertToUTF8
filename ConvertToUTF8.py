@@ -141,7 +141,7 @@ def get_settings():
 
 def get_setting(view, key):
 	# read project specific settings first
-	return view.settings().get(key, SETTINGS[key]);
+	return view.settings().get(key, SETTINGS[key])
 
 TMP_DIR = None
 
@@ -218,10 +218,12 @@ if not ST3:
 def detect(view, file_name, cnt):
 	if not file_name or not os.path.exists(file_name) or os.path.getsize(file_name) == 0:
 		return
-	encoding = encoding_cache.pop(file_name)
-	if encoding:
-		sublime.set_timeout(lambda: init_encoding_vars(view, encoding, detect_on_fail=True), 0)
-		return
+	print("start detect ")
+	# encoding = encoding_cache.pop(file_name)
+	# print("detect, encoding ", encoding)
+	# if encoding:
+	# 	sublime.set_timeout(lambda: init_encoding_vars(view, encoding, detect_on_fail=True), 0)
+	# 	return
 	sublime.set_timeout(lambda: view.set_status('origin_encoding', 'Detecting encoding, please wait...'), 0)
 	detector = UniversalDetector()
 	fp = open(file_name, 'rb')
@@ -245,22 +247,27 @@ def check_encoding(view, encoding, confidence):
 	result = 'Detected {0} vs {1} with {2:.0%} confidence'.format(encoding, view_encoding, confidence) if encoding else 'Encoding can not be detected'
 	view.set_status('origin_encoding', result)
 	print(result)
+	print("view_encoding, ", view.encoding)
+	print("confidence ", confidence)
+	print("setting.confidence ", SETTINGS['confidence'])
 	not_detected = not encoding or confidence < SETTINGS['confidence'] or encoding == view_encoding
 	# ST can't detect the encoding
 	if view_encoding in ('Undefined', view.settings().get('fallback_encoding')):
 		if not_detected:
+			print("show_selection_4")
 			show_selection(view)
 			return
 	else:
 		if not_detected:
 			# using encoding detected by ST
 			encoding = view_encoding
-		else:
-			show_selection(view, [
-				['{0} ({1:.0%})'.format(encoding, confidence), encoding],
-				['{0}'.format(view_encoding), view_encoding]
-			])
-			return
+		# else:
+		# 	print("show_selection_5")
+		# 	show_selection(view, [
+		# 		['{0} ({1:.0%})'.format(encoding, confidence), encoding],
+		# 		['{0}'.format(view_encoding), view_encoding]
+		# 	])
+		# 	return
 	init_encoding_vars(view, encoding)
 
 def show_encoding_status(view):
@@ -276,9 +283,9 @@ def init_encoding_vars(view, encoding, run_convert=True, stamp=None, detect_on_f
 		return
 	view.settings().set('origin_encoding', encoding)
 	show_encoding_status(view)
-	if encoding in SKIP_ENCODINGS or encoding == view.encoding():
-		encoding_cache.set(view.file_name(), encoding)
-		return
+	# if encoding in SKIP_ENCODINGS or encoding == view.encoding():
+	# 	encoding_cache.set(view.file_name(), encoding)
+	# 	return
 	view.settings().set('in_converting', True)
 	if run_convert:
 		if stamp == None:
@@ -293,7 +300,7 @@ def clean_encoding_vars(view):
 	view.settings().erase('origin_encoding')
 	view.erase_status('origin_encoding')
 	view.set_scratch(False)
-	encoding_cache.pop(view.file_name())
+	# encoding_cache.pop(view.file_name())
 
 def remove_reverting(file_name):
 	while file_name in REVERTING_FILES:
@@ -348,6 +355,7 @@ stamps = {}
 
 class ShowEncodingSelectionCommand(sublime_plugin.TextCommand):
 	def run(self, edit):
+		print("show_selection_2")
 		show_selection(self.view)
 
 class ReloadWithEncodingCommand(sublime_plugin.TextCommand):
@@ -411,6 +419,7 @@ class ConvertToUtf8Command(sublime_plugin.TextCommand):
 		if not (file_name and os.path.exists(file_name)):
 			return
 		# try fast decode
+		print("convert_to_utf8, ", encoding)
 		fp = None
 		try:
 			fp = codecs.open(file_name, 'rb', encoding, errors='strict')
@@ -446,17 +455,19 @@ class ConvertToUtf8Command(sublime_plugin.TextCommand):
 					fp = codecs.open(file_name, 'rb', encoding, errors='ignore')
 					contents = fp.read()
 				else:
+					print("show_selection_1")
 					show_selection(view)
 					return
 			else:
 				view.set_status('origin_encoding', u'Errors occurred while converting {0} with {1} encoding'.format
 						(os.path.basename(file_name), encoding))
 				show_selection(view)
+				print("show_selection_3")
 				return
 		finally:
 			if fp:
 				fp.close()
-		encoding_cache.set(file_name, encoding)
+		# encoding_cache.set(file_name, encoding)
 		contents = contents.replace('\r\n', '\n').replace('\r', '\n')
 		regions = sublime.Region(0, view.size())
 		sel = view.sel()
@@ -470,6 +481,7 @@ class ConvertToUtf8Command(sublime_plugin.TextCommand):
 		view.set_viewport_position(vp, False)
 		stamps[file_name] = stamp
 		sublime.status_message('{0} -> UTF8'.format(encoding))
+		print("finish convert_to_utf8")
 
 	def find_region(self, reg):
 		view = self.view
@@ -516,7 +528,7 @@ class ConvertFromUtf8Command(sublime_plugin.TextCommand):
 			encoding = view.settings().get('origin_encoding')
 		file_name = view.file_name()
 		if not encoding or encoding == 'UTF-8':
-			encoding_cache.pop(file_name)
+			# encoding_cache.pop(file_name)
 			return
 		# remember current folded regions
 		regions = [[x.a, x.b] for x in view.folded_regions()]
@@ -525,9 +537,13 @@ class ConvertFromUtf8Command(sublime_plugin.TextCommand):
 		vp = view.viewport_position()
 		view.settings().set('viewport_position', [vp[0], vp[1]])
 		fp = None
+		print("convert from utf8, orig_encoding = ", encoding)
 		try:
-			fp = open(file_name, 'rb')
-			contents = codecs.EncodedFile(fp, encoding, 'UTF-8').read()
+			# fp = open(file_name, 'rb')
+			fp = codecs.open(file_name, "rb", "UTF-8")
+			contents = fp.read()
+			contents = contents.encode(encoding)
+			# contents = codecs.EncodedFile(fp, encoding, 'UTF-8').read()
 		except (LookupError, UnicodeEncodeError) as e:
 			sublime.error_message(u'Can not convert file encoding of {0} to {1}, it was saved as UTF-8 instead:\n\n{2}'.format
 					(os.path.basename(file_name), encoding, e))
@@ -535,6 +551,11 @@ class ConvertFromUtf8Command(sublime_plugin.TextCommand):
 		finally:
 			if fp:
 				fp.close()
+		
+		fp = open(file_name, "wb", encoding)
+		fp.write(contents)
+		view.set_scratch(True)
+
 		# write content to temporary file
 		tmp_name = os.path.join(TMP_DIR, get_temp_name(file_name))
 		fp = open(tmp_name, 'wb')
@@ -548,7 +569,7 @@ class ConvertFromUtf8Command(sublime_plugin.TextCommand):
 			# copy the timestamp from original file
 			mtime = os.path.getmtime(file_name)
 			os.utime(tmp_name, (mtime, mtime))
-		encoding_cache.set(file_name, encoding)
+		# encoding_cache.set(file_name, encoding)
 		view.settings().set('prevent_detect', True)
 		sublime.status_message('UTF8 -> {0}'.format(encoding))
 
@@ -658,9 +679,10 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 		encoding = view.encoding()
 		if encoding == 'Hexadecimal' or encoding.endswith(' BOM'):
 			return
-
+		print("file encoding" , encoding)
 		#if sublime text already load right, no need to check the file's encoding
 		if encoding not in ('Undefined', view.settings().get('fallback_encoding')):
+			print("unknown encoding")
 			return
 
 		file_name = view.file_name()
@@ -669,6 +691,7 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 		if self.check_clones(view):
 			return
 		encoding = view.settings().get('origin_encoding')
+		print("origin_encoding", encoding)
 		if encoding and not view.get_status('origin_encoding'):
 			view.set_status('origin_encoding', encoding)
 			# file is reloading
@@ -685,6 +708,7 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 				return
 		if not get_setting(view, 'convert_on_load'):
 			return
+		print("convert on load")
 		self.perform_action(view, file_name, 5)
 
 	def on_activated(self, view):
@@ -710,6 +734,8 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 		threading.Thread(target=lambda: detect(view, file_name, cnt)).start()
 
 	def perform_action(self, view, file_name, times):
+		print("preview_action ", get_setting(view, 'preview_action'))
+		print("is_preview ", self.is_preview(view))
 		if not get_setting(view, 'preview_action') and self.is_preview(view):
 			if times > 0:
 				# give it another chance before everything is ready
@@ -725,6 +751,7 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 		encoding = view.encoding()
 		if encoding == 'Hexadecimal':
 			return
+		print("modify, ", encoding)
 		file_name = view.file_name()
 		if not file_name or view.is_loading():
 			if get_setting(view, 'convert_on_find') and self.is_find_results(view):
@@ -746,15 +773,20 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 							return
 						sublime.set_timeout(lambda: view.run_command('convert_text_to_utf8', {'begin_line': begin_line, 'end_line': end_line, 'encoding': encoding}), 0)
 			return
+		print("view.in_converting, ", view.settings().get('in_coverting'))
+		print("view.is_preview, ", view.settings().get('is_preview'))
 		if not view.settings().get('in_converting'):
 			if view.settings().get('is_preview'):
 				view.settings().erase('is_preview')
+				print("modify detect")
 				detect(view, file_name, get_setting(view, 'max_detect_lines'))
 			return
 		if self.check_clones(view):
 			return
 		command = view.command_history(0, True)
 		command1 = view.command_history(1, True)
+		print("his_command, ", command)
+		print("his_command, ", command1)
 		if command == NONE_COMMAND:
 			if command1[0] == 'convert_to_utf8':
 				view.run_command('redo')
@@ -814,9 +846,11 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 		if view.encoding() == 'Hexadecimal':
 			return
 		force_encoding = view.settings().get('force_encoding')
+		print("force_encoding = {0}".format(force_encoding))
 		if force_encoding == 'UTF-8':
 			view.set_encoding(force_encoding)
 			return
+		print("on_pre_save, in_coverting = {0}".format(view.settings().get('in_converting')))
 		if not view.settings().get('in_converting'):
 			return
 		if self.check_clones(view):
@@ -825,9 +859,12 @@ class ConvertToUTF8Listener(sublime_plugin.EventListener):
 
 	def on_post_save(self, view):
 		view_encoding = view.encoding()
+		print("on_post_save, encoding = {0}".format(view_encoding))
 		if view_encoding == 'Hexadecimal':
 			return
+		print("on_post_save, in_coverting = {0}".format(view.settings().get('in_converting')))	
 		if not view.settings().get('in_converting'):
+			print("on_post_save")	
 			return
 		if self.check_clones(view):
 			return

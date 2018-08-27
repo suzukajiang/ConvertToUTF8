@@ -16,7 +16,7 @@
 	"max_cache_size" : 100,
 
 	// Maximum lines to detect, 0 means unlimited
-	"max_detect_lines" : 600,
+	"max_detect_lines" : 0,
 
 	// Convert when previewing file: true or false
 	"preview_action" : false,
@@ -28,7 +28,7 @@
 	"lazy_reload": false,
 
 	// The minimum confidence rate between 0.0 and 1.0
-	"confidence": 0.95,
+	"confidence": 0.9,
 
 	// Convert in Find Results view
 	"convert_on_find": false,
